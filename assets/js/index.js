@@ -9,6 +9,17 @@ var reset = document.getElementById("reset-settings");
 var scrollToUp = document.getElementById("scroll-to-top");
 var portfolioFilter = document.querySelector("#portfolio-filters");
 var portfolioCards = document.querySelectorAll(".portfolio-item");
+var carousel = document.getElementById("testimonials-carousel");
+var testimonialCards = document.querySelectorAll(".testimonial-card");
+var nextTestimonial = document.getElementById("next-testimonial");
+var prevTestimonial = document.getElementById("prev-testimonial");
+var indicatorsBox = document.querySelector(".carousel-indicator").parentElement;
+var currentSlide = 0;
+var autoPlay;
+var menuBtn = document.getElementById("mobile-menu-btn");
+var navLinks = document.getElementById("nav-links");
+var navAnchors = document.querySelectorAll(".nav-links a");
+
 // var portfolioGrid = document.querySelectorAll("#portfolio-grid div")
 
 // open sidebar
@@ -21,7 +32,7 @@ toggleGear.addEventListener("click", function () {
 
 // close sidebar
 closeSettings.addEventListener("click", function () {
-  toggleGear.focus(); // move focus out of the panel before it becomes inert
+  toggleGear.focus();
   toggleGear.style.transform = "translateY(-50%)";
   toggleGear.setAttribute("aria-expanded", "false");
   settingsSidebar.inert = true;
@@ -231,63 +242,57 @@ portfolioFilter.addEventListener("click", function (e) {
   }
 });
 
-// the card already has "transition-all duration-300", so opacity and scale animate in 300ms
-
-// grow + fade a card in
+// cards 
 function showCard(card) {
-  clearTimeout(card.animTimer); // cancel any animation still running on this card
+  card.dataset.visible = "yes";
 
-  // already visible -> just make sure it's full size
-  if (!card.classList.contains("hidden")) {
+  if (card.classList.contains("hidden")) {
+    setTimeout(function () {
+      if (card.dataset.visible === "yes") {
+        card.classList.remove("hidden");
+      }
+    }, 300);
+
+    setTimeout(function () {
+      if (card.dataset.visible === "yes") {
+        card.style.opacity = 1;
+        card.style.transform = "scale(1)";
+      }
+    }, 350);
+  } else {
     card.style.opacity = 1;
     card.style.transform = "scale(1)";
-    return;
   }
-
-  // wait for the other cards to finish shrinking, then show this one
-  card.animTimer = setTimeout(function () {
-    card.classList.remove("hidden");
-    card.animTimer = setTimeout(function () {
-      card.style.opacity = 1;
-      card.style.transform = "scale(1)";
-    }, 50);
-  }, 300);
 }
 
-// shrink + fade a card out, then hide it
 function hideCard(card) {
-  clearTimeout(card.animTimer);
-
+  card.dataset.visible = "no";
   card.style.opacity = 0;
   card.style.transform = "scale(0)";
 
-  card.animTimer = setTimeout(function () {
-    card.classList.add("hidden");
+  setTimeout(function () {
+    if (card.dataset.visible === "no") {
+      card.classList.add("hidden");
+    }
   }, 300);
 }
 
-// testimonials carousel
-var carousel = document.getElementById("testimonials-carousel");
-var testimonialCards = document.querySelectorAll(".testimonial-card");
-var nextTestimonial = document.getElementById("next-testimonial");
-var prevTestimonial = document.getElementById("prev-testimonial");
-var indicatorsBox = document.querySelector(".carousel-indicator").parentElement;
-var currentSlide = 0;
-var autoPlay;
+// carousel part 
 
-// how many cards fit on the screen (same breakpoints as w-full sm:w-1/2 lg:w-1/3)
 function cardsPerView() {
-  if (window.innerWidth >= 1024) return 3;
-  if (window.innerWidth >= 640) return 2;
-  return 1;
+  if (window.innerWidth >= 1024) {
+    return 3;
+  } else if (window.innerWidth >= 640) {
+    return 2;
+  } else {
+    return 1;
+  }
 }
 
-// last position we can move to without showing empty space
 function lastSlide() {
   return testimonialCards.length - cardsPerView();
 }
 
-// one dot for each position (4 on desktop, 5 on tablet, 6 on phone)
 function buildIndicators() {
   indicatorsBox.innerHTML = "";
   for (let i = 0; i <= lastSlide(); i++) {
@@ -303,25 +308,31 @@ function buildIndicators() {
 }
 
 function goToSlide(index) {
-  // loop around at both ends
-  if (index > lastSlide()) index = 0;
-  if (index < 0) index = lastSlide();
+  if (index > lastSlide()) {
+    index = 0;
+  }
+  if (index < 0) {
+    index = lastSlide();
+  }
   currentSlide = index;
 
-  // the page is RTL, so the next cards are on the left -> move the row to the right (+)
   const cardWidth = testimonialCards[0].offsetWidth;
   carousel.style.transform = "translateX(" + currentSlide * cardWidth + "px)";
 
   for (let i = 0; i < indicatorsBox.children.length; i++) {
-    const isActive = i === currentSlide;
-    indicatorsBox.children[i].classList.toggle("bg-accent", isActive);
-    indicatorsBox.children[i].classList.toggle("bg-slate-400", !isActive);
-    indicatorsBox.children[i].classList.toggle("dark:bg-slate-600", !isActive);
-    indicatorsBox.children[i].setAttribute("aria-selected", isActive);
+    const dot = indicatorsBox.children[i];
+    if (i === currentSlide) {
+      dot.classList.add("bg-accent");
+      dot.classList.remove("bg-slate-400", "dark:bg-slate-600");
+      dot.setAttribute("aria-selected", "true");
+    } else {
+      dot.classList.remove("bg-accent");
+      dot.classList.add("bg-slate-400", "dark:bg-slate-600");
+      dot.setAttribute("aria-selected", "false");
+    }
   }
 }
 
-// clicking restarts the 5-second timer so it doesn't jump right after a click
 nextTestimonial.addEventListener("click", function () {
   goToSlide(currentSlide + 1);
   startAutoPlay();
@@ -340,7 +351,6 @@ indicatorsBox.addEventListener("click", function (e) {
   }
 });
 
-// move to the next card every 5 seconds, pause while the mouse is over the carousel
 function startAutoPlay() {
   clearInterval(autoPlay);
   autoPlay = setInterval(function () {
@@ -353,59 +363,67 @@ carousel.addEventListener("mouseenter", function () {
 });
 carousel.addEventListener("mouseleave", startAutoPlay);
 
-// card width and number of dots change with the screen size
 window.addEventListener("resize", function () {
   buildIndicators();
-  goToSlide(Math.min(currentSlide, lastSlide()));
+  if (currentSlide > lastSlide()) {
+    currentSlide = lastSlide();
+  }
+  goToSlide(currentSlide);
 });
 
 buildIndicators();
 goToSlide(0);
 startAutoPlay();
 
-// mobile menu (burger icon)
-var menuBtn = document.getElementById("mobile-menu-btn");
-var navLinks = document.getElementById("nav-links");
-var navAnchors = document.querySelectorAll(".nav-links a");
+// burger menu
+function openMenu() {
+  const icon = menuBtn.firstElementChild;
+  navLinks.classList.add("active");
+  menuBtn.setAttribute("aria-expanded", "true");
+  menuBtn.setAttribute("aria-label", "إغلاق القائمة");
+  icon.classList.remove("fa-bars");
+  icon.classList.add("fa-xmark");
+}
 
-function setMenu(open) {
-  navLinks.classList.toggle("active", open); // .nav-links.active slides the menu in (style.css)
-  menuBtn.setAttribute("aria-expanded", open);
-  menuBtn.setAttribute("aria-label", open ? "إغلاق القائمة" : "فتح القائمة");
-  // swap the icon: bars when closed, X when open
-  menuBtn.firstElementChild.classList.toggle("fa-bars", !open);
-  menuBtn.firstElementChild.classList.toggle("fa-xmark", open);
+function closeMenu() {
+  const icon = menuBtn.firstElementChild;
+  navLinks.classList.remove("active");
+  menuBtn.setAttribute("aria-expanded", "false");
+  menuBtn.setAttribute("aria-label", "فتح القائمة");
+  icon.classList.remove("fa-xmark");
+  icon.classList.add("fa-bars");
 }
 
 menuBtn.addEventListener("click", function () {
-  setMenu(!navLinks.classList.contains("active"));
+  if (navLinks.classList.contains("active")) {
+    closeMenu();
+  } else {
+    openMenu();
+  }
 });
 
-// close the menu after choosing a link
 for (let i = 0; i < navAnchors.length; i++) {
   navAnchors[i].addEventListener("click", function () {
-    setMenu(false);
+    closeMenu();
   });
 }
 
-// navbar underline: mark the link of the section that is on the screen
 function updateActiveLink() {
   let current = navAnchors[0];
   for (let i = 0; i < navAnchors.length; i++) {
     const section = document.querySelector(navAnchors[i].getAttribute("href"));
-    // the section's top has passed the bottom of the fixed navbar
     if (section && section.getBoundingClientRect().top <= 120) {
       current = navAnchors[i];
     }
   }
-  // at the very bottom of the page, the last section may be too short to reach the top
   if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) {
     current = navAnchors[navAnchors.length - 1];
   }
 
   for (let i = 0; i < navAnchors.length; i++) {
-    navAnchors[i].classList.toggle("active", navAnchors[i] === current); // .nav-links a.active draws the underline
+    navAnchors[i].classList.remove("active");
   }
+  current.classList.add("active");
 }
 
 window.addEventListener("scroll", updateActiveLink);
